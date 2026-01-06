@@ -2,30 +2,103 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 permissions:
   contents: read
 
 jobs:
-  basic-checks:
-    name: Basic Checks
+  test:
+    name: Lint and Tests (auto-detect stack)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show repository structure
+      - name: Show structure
         run: |
-          echo "Repo root:"
+          echo "Root:"
           ls -la
-          echo "Docs:"
+          echo "docs:"
           ls -la docs || true
+          echo "src:"
+          ls -la src || true
+          echo "tests:"
+          ls -la tests || true
 
-      - name: Placeholder - add your build/test steps later
+      # -------------------------
+      # Python (if requirements.txt exists)
+      # -------------------------
+      - name: Set up Python
+        if: ${{ hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        if: ${{ hashFiles('requirements.txt') != '' }}
         run: |
-          echo "CI skeleton is running."
-          echo "Next: add lint + unit tests + security scans based on your tech stack."
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Python dependencies (pyproject)
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Run Python tests (pytest)
+        if: ${{ hashFiles('tests/**') != '' && (hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != '') }}
+        run: |
+          python -m pip install pytest
+          pytest -q
+
+      # -------------------------
+      # Node.js (if package.json exists)
+      # -------------------------
+      - name: Set up Node
+        if: ${{ hashFiles('package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Node dependencies
+        if: ${{ hashFiles('package.json') != '' }}
+        run: |
+          npm ci
+
+      - name: Run Node tests
+        if: ${{ hashFiles('package.json') != '' }}
+        run: |
+          npm test --if-present
+
+      # -------------------------
+      # PHP (if composer.json exists)
+      # -------------------------
+      - name: Set up PHP
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Install PHP dependencies
+        if: ${{ hashFiles('composer.json') != '' }}
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run PHP tests (phpunit)
+        if: ${{ hashFiles('composer.json') != '' && hashFiles('vendor/bin/phpunit') != '' }}
+        run: |
+          ./vendor/bin/phpunit
+
+      # -------------------------
+      # If no stack detected, do not fail the build
+      # -------------------------
+      - name: No stack detected (placeholder)
+        if: ${{ hashFiles('requirements.txt') == '' && hashFiles('pyproject.toml') == '' && hashFiles('package.json') == '' && hashFiles('composer.json') == '' }}
+        run: |
+          echo "No runtime stack files detected yet (requirements.txt / pyproject.toml / package.json / composer.json)."
+          echo "CI is configured and will run tests once implementation files are added."
