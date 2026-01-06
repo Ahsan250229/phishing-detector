@@ -44,11 +44,13 @@ The system analyses email content using **rule-based heuristics** to identify po
 
 
 ## Repository Structure
-src/ - Application source code
-tests/ - Unit, integration, and security tests
-docs/ - Project documentation (Part 1 & Part 2)
-ci-cd/ - CI/CD pipeline documentation
-.github/ - GitHub Actions workflows
+'''
+src/       - Application source code
+tests/     - Unit, integration, and security tests
+docs/      - Project documentation (Part 1 & Part 2)
+ci-cd/     - CI/CD pipeline documentation
+.github/   - GitHub Actions workflows
+'''
 
 
 ---
