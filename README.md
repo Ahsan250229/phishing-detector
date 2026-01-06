@@ -2,7 +2,7 @@
 
 ## Overview
 This project is a **phishing email detection prototype** developed using **DevSecOps principles**.  
-Security is integrated throughout the software lifecycle, including **design, development, testing, CI/CD automation, monitoring, and incident response**.
+Security is integrated throughout the software lifecycle, including **design, development, testing, CI/CD planning, monitoring, and incident response**.
 
 The system analyses email content using **rule-based heuristics** to identify potential phishing indicators and returns a structured risk assessment.
 
@@ -15,9 +15,6 @@ The system analyses email content using **rule-based heuristics** to identify po
 - Scoring-based decision logic with explainable reasons
 - Secure input validation and error handling
 - Structured logging with unique request identifiers
-- Automated CI/CD using GitHub Actions
-- Dependency vulnerability monitoring via Dependabot
-- Static Application Security Testing (SAST) using open-source tools
 
 ---
 
@@ -26,32 +23,31 @@ The system analyses email content using **rule-based heuristics** to identify po
 - Two-factor authentication (2FA)
 - Email quarantine and reporting workflows
 - Machine-learning-based phishing classification
+- CI/CD pipeline automation using GitHub Actions
+- Static Application Security Testing (SAST)
 - Dynamic Application Security Testing (DAST) using OWASP ZAP
 - Production-grade deployment and scaling
 
 ---
 
 ## Technology Stack
-- **Python (FastAPI)**
-- **Pydantic** (data validation)
+- **Python (Flask)**
 - **Pytest** (unit and integration testing)
-- **GitHub Actions** (CI/CD automation)
-- **Semgrep** (SAST)
+- **GitHub Actions** (planned CI/CD)
+- **Bandit / Semgrep** (planned SAST)
 - **pip-audit** (dependency vulnerability scanning)
 - **OWASP ZAP** (planned DAST)
 
 ---
 
-
 ## Repository Structure
-'''
+```
 src/       - Application source code
 tests/     - Unit, integration, and security tests
-docs/      - Project documentation (Part 1 & Part 2)
+docs/      - Project documentation
 ci-cd/     - CI/CD pipeline documentation
 .github/   - GitHub Actions workflows
-'''
-
+```
 
 ## Run (Python / Flask)
 
@@ -61,4 +57,4 @@ ci-cd/     - CI/CD pipeline documentation
 pip install -r requirements.txt
 python -m flask run
 pytest -q
-'''
+```
