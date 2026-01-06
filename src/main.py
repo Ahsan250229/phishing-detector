@@ -49,8 +49,5 @@ async def add_request_id_and_logging(request: Request, call_next):
         request_id, request.method, str(request.url.path), response.status_code, latency_ms
     )
     return response
-
-
-# Routers must be included AFTER app is created
-app.include_router(auth_router, prefix="/auth")
+app.include_router(auth_router)              # because routes.py already has prefix="/auth"
 app.include_router(api_router, prefix="/api")
