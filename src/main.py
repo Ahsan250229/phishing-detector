@@ -2,12 +2,11 @@ import os
 import uuid
 import time
 import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
 from auth.routes import router as auth_router
-app.include_router(auth_router)
-
-
 from src.api.routes import router as api_router
 
 APP_ENV = os.getenv("APP_ENV", "development")
@@ -51,4 +50,7 @@ async def add_request_id_and_logging(request: Request, call_next):
     )
     return response
 
+
+# Routers must be included AFTER app is created
+app.include_router(auth_router, prefix="/auth")
 app.include_router(api_router, prefix="/api")
