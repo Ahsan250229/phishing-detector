@@ -53,28 +53,12 @@ ci-cd/     - CI/CD pipeline documentation
 '''
 
 
----
-
-## Run (Python / FastAPI)
+## Run (Python / Flask)
 
 ### Local Setup
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-uvicorn src.main:app --reload
 
+```bash
+pip install -r requirements.txt
+python -m flask run
 pytest -q
-
-
----
-
-# Step-by-step: how to apply this on GitHub
-1. Open your repository → `README.md`
-2. Click the **pencil icon** (Edit)
-3. Find the section that starts at **“Repository Structure”**
-4. Replace that whole section with the block above
-5. Click **Preview** tab to confirm it looks clean
-6. **Commit changes**
-
-✅ Commit message:
-
+'''
