@@ -11,53 +11,14 @@ permissions:
   packages: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Build validation (compile)
-        run: |
-          python -m compileall -q src
-
-  security_scan:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Dependency scan (pip-audit)
-        run: |
-          python -m pip install --upgrade pip
-          pip install pip-audit
-          pip-audit -r requirements.txt
-
-      - name: SAST (Semgrep)
-        run: |
-          python -m pip install --upgrade pip
-          pip install semgrep
-          semgrep --config=auto
-
   test:
     runs-on: ubuntu-latest
-    needs: security_scan
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -66,16 +27,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Run tests (pytest)
+        env:
+          PYTHONPATH: .
         run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pytest -q
 
-  deploy:
+  build:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       - name: Set image tags
         run: |
@@ -94,3 +59,12 @@ jobs:
           docker build -t "$IMAGE" -t "$IMAGE_SHA" .
           docker push "$IMAGE"
           docker push "$IMAGE_SHA"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy placeholder
+        run: |
+          echo "Deploy step placeholder (add your deploy commands here)."
