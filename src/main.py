@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from auth.routes import router as auth_router
+from src.auth.routes import router as auth_router
 from src.api.routes import router as api_router
 
 APP_ENV = os.getenv("APP_ENV", "development")
@@ -49,5 +49,8 @@ async def add_request_id_and_logging(request: Request, call_next):
         request_id, request.method, str(request.url.path), response.status_code, latency_ms
     )
     return response
-app.include_router(auth_router)              # because routes.py already has prefix="/auth"
+
+
+# routes.py already has prefix="/auth"
+app.include_router(auth_router)
 app.include_router(api_router, prefix="/api")
