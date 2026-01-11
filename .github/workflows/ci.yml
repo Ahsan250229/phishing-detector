@@ -15,19 +15,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Show structure
-        run: |
-          echo "Root:"
-          ls -la
-          echo "docs:"
-          ls -la docs || true
-          echo "src:"
-          ls -la src || true
-          echo "tests:"
-          ls -la tests || true
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       # -------------------------
       # Python (if requirements.txt exists)
@@ -55,23 +44,25 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pytest -q
 
       # -------------------------
       # Node.js (if package.json exists)
       # -------------------------
-      - name: Set up Node
+      - name: Set up Node.js
         if: ${{ hashFiles('package.json') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install Node dependencies
+      - name: Install Node.js dependencies
         if: ${{ hashFiles('package.json') != '' }}
         run: |
           npm ci
 
-      - name: Run Node tests
+      - name: Run Node.js tests
         if: ${{ hashFiles('package.json') != '' }}
         run: |
           npm test --if-present
@@ -94,6 +85,17 @@ jobs:
         if: ${{ hashFiles('composer.json') != '' && hashFiles('vendor/bin/phpunit') != '' }}
         run: |
           ./vendor/bin/phpunit
+
+      # -------------------------
+      # Docs sanity (if docs/ exists)
+      # -------------------------
+      - name: List docs (if present)
+        if: ${{ hashFiles('docs/**') != '' }}
+        run: |
+          echo "docs:"
+          ls -la
+          echo "docs folder:"
+          ls -la docs
 
       # -------------------------
       # If no stack detected, do not fail the build
