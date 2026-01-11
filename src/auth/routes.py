@@ -5,9 +5,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 
-from auth.models import (
+from src.auth.models import (
     LoginRequest,
     MessageResponse,
     OTPSetupResponse,
@@ -17,9 +16,9 @@ from auth.models import (
     UserRecord,
     UserRole,
 )
-from auth.otp import generate_otp_secret, provisioning_uri, verify_otp_code
-from auth.utils import create_access_token, hash_password, verify_password
-from auth.dependencies import (
+from src.auth.otp import generate_otp_secret, provisioning_uri, verify_otp_code
+from src.auth.utils import create_access_token, hash_password, verify_password
+from src.auth.dependencies import (
     get_current_user,
     get_user_by_username,
     save_user,
@@ -55,10 +54,16 @@ def register(payload: RegisterRequest) -> MessageResponse:
 def login(payload: LoginRequest) -> TokenResponse:
     user = get_user_by_username(payload.username)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
 
     if not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
 
     # Create token; if OTP enabled, require OTP verification later.
     token = create_access_token(
@@ -88,7 +93,10 @@ def otp_setup(user: UserRecord = Depends(get_current_user)) -> OTPSetupResponse:
 
 
 @router.post("/otp/verify", response_model=TokenResponse)
-def otp_verify(payload: OTPVerifyRequest, user: UserRecord = Depends(get_current_user)) -> TokenResponse:
+def otp_verify(
+    payload: OTPVerifyRequest,
+    user: UserRecord = Depends(get_current_user),
+) -> TokenResponse:
     """
     Verify user OTP and return upgraded token with otp_verified=true.
     """
@@ -96,7 +104,10 @@ def otp_verify(payload: OTPVerifyRequest, user: UserRecord = Depends(get_current
         raise HTTPException(status_code=400, detail="OTP not enabled for this user")
 
     if not verify_otp_code(user.otp_secret, payload.otp_code):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP code")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid OTP code",
+        )
 
     token = create_access_token(
         subject=user.id,
