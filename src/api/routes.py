@@ -1,19 +1,21 @@
 # src/api/routes.py
 import os
 import uuid
+import io
+import csv
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse, Response
 
 from src.models.schemas import ScanRequest, ScanResponse
 from src.core.detector import analyze_email
+
 from src.services.header_analyzer import analyze_headers
 from src.services.attachment_scanner import scan_attachments
+
 from src.models.quarantine import QuarantineRecord
 from src.storage.quarantine_store import save_record, get_record
 
-import csv
-import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -29,14 +31,25 @@ def health():
 
 @router.post("/scan-email", response_model=ScanResponse)
 def scan_email(payload: ScanRequest):
+    scan_id = str(uuid.uuid4())
+    request_id = str(uuid.uuid4())
+
     # Basic DoS prevention
     if len(payload.email_text) > MAX_EMAIL_CHARS:
-        scan_id = str(uuid.uuid4())
-        request_id = str(uuid.uuid4())
-        return ScanResponse(
+        rec = QuarantineRecord(
+            scan_id=scan_id,
             verdict="REJECTED",
             score=0,
             reasons=[f"Email content too large (max {MAX_EMAIL_CHARS} chars)"],
+            urls=[],
+            status="STORED",
+        )
+        save_record(rec)
+
+        return ScanResponse(
+            verdict="REJECTED",
+            score=0,
+            reasons=rec.reasons,
             urls=[],
             header_score=0,
             header_findings=[],
@@ -45,9 +58,6 @@ def scan_email(payload: ScanRequest):
             scan_id=scan_id,
             request_id=request_id,
         )
-
-    scan_id = str(uuid.uuid4())
-    request_id = str(uuid.uuid4())
 
     # Core content analysis
     result = analyze_email(payload.email_text)
@@ -73,9 +83,7 @@ def scan_email(payload: ScanRequest):
         total_score += attachment_score
         reasons.extend(attachment_findings)
 
-    # Re-classify based on total score
-    # Keep your same thresholds for consistency
-    verdict = result["verdict"]
+    # Final classification (consistent thresholds)
     if total_score >= 60:
         verdict = "PHISHING"
     elif total_score >= 30:
