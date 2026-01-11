@@ -8,8 +8,8 @@ from typing import Dict, Optional, Callable
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from auth.models import UserRecord, UserRole
-from auth.utils import decode_token, hash_password
+from src.auth.models import UserRecord, UserRole
+from src.auth.utils import decode_token, hash_password
 
 bearer_scheme = HTTPBearer(auto_error=True)
 
@@ -77,22 +77,28 @@ def get_current_user(
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
 
     user = get_user_by_id(user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
 
-    # Attach OTP state from token (not persisted)
-    # If otp_enabled is True, we require otp_verified in token for protected routes.
+    # Attach OTP state from token (runtime-only flag)
     otp_verified = bool(payload.get("otp_verified", False))
-    # We won't mutate user model; we'll enforce in a separate dependency.
-    user.__dict__["_otp_verified"] = otp_verified  # internal runtime flag
+    user.__dict__["_otp_verified"] = otp_verified
 
     return user
 
 
-def require_otp_verified(user: UserRecord = Depends(get_current_user)) -> UserRecord:
+def require_otp_verified(
+    user: UserRecord = Depends(get_current_user),
+) -> UserRecord:
     """
     If user has 2FA enabled, block unless token indicates otp_verified=True.
     """
@@ -109,6 +115,10 @@ def require_otp_verified(user: UserRecord = Depends(get_current_user)) -> UserRe
 def require_role(role: UserRole) -> Callable:
     def _dep(user: UserRecord = Depends(require_otp_verified)) -> UserRecord:
         if user.role != role:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient role",
+            )
         return user
+
     return _dep
