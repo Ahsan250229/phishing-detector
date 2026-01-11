@@ -4,7 +4,7 @@ import uuid
 import io
 import csv
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse, Response
 
 from src.models.schemas import ScanRequest, ScanResponse
@@ -15,6 +15,10 @@ from src.services.attachment_scanner import scan_attachments
 
 from src.models.quarantine import QuarantineRecord
 from src.storage.quarantine_store import save_record, get_record
+
+# ✅ AUTH ENFORCEMENT (JWT + OTP gating + RBAC)
+from src.auth.dependencies import require_otp_verified, require_role
+from src.auth.models import UserRecord, UserRole
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -29,8 +33,12 @@ def health():
     return {"status": "ok", "service": "phishing-detector", "version": "0.1.0"}
 
 
+# ✅ Protect scan feature: JWT required + OTP required if otp_enabled=True
 @router.post("/scan-email", response_model=ScanResponse)
-def scan_email(payload: ScanRequest):
+def scan_email(
+    payload: ScanRequest,
+    _user: UserRecord = Depends(require_otp_verified),
+):
     scan_id = str(uuid.uuid4())
     request_id = str(uuid.uuid4())
 
@@ -130,8 +138,12 @@ def scan_email(payload: ScanRequest):
 # Reports (CSV + PDF exports)
 # ----------------------------
 
+# ✅ Admin-only export: JWT required + OTP required if otp_enabled=True + role must be admin
 @router.get("/reports/{scan_id}.csv")
-def export_csv(scan_id: str):
+def export_csv(
+    scan_id: str,
+    _user: UserRecord = Depends(require_role(UserRole.admin)),
+):
     rec = get_record(scan_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Scan ID not found")
@@ -175,8 +187,12 @@ def export_csv(scan_id: str):
     )
 
 
+# ✅ Admin-only export: JWT required + OTP required if otp_enabled=True + role must be admin
 @router.get("/reports/{scan_id}.pdf")
-def export_pdf(scan_id: str):
+def export_pdf(
+    scan_id: str,
+    _user: UserRecord = Depends(require_role(UserRole.admin)),
+):
     rec = get_record(scan_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Scan ID not found")
