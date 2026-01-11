@@ -22,8 +22,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+
 @app.middleware("http")
-async def add_request_id_and_logging(request: Request, call_next):
+async def add_request_id_logging_and_security_headers(request: Request, call_next):
+    """
+    Middleware responsibilities:
+    - Add request correlation id (X-Request-ID)
+    - Structured request logging
+    - Prevent stacktrace leakage (generic 500 response)
+    - Add basic security header(s)
+    """
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     start = time.time()
 
@@ -33,7 +41,8 @@ async def add_request_id_and_logging(request: Request, call_next):
         # Do not leak stack traces to clients
         logger.exception(
             '{"event":"unhandled_exception","request_id":"%s","path":"%s"}',
-            request_id, str(request.url.path)
+            request_id,
+            str(request.url.path),
         )
         return JSONResponse(
             status_code=500,
@@ -41,16 +50,24 @@ async def add_request_id_and_logging(request: Request, call_next):
         )
 
     latency_ms = int((time.time() - start) * 1000)
+
+    # Response headers
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
 
+    # Structured logs
     logger.info(
         '{"event":"http_request","request_id":"%s","method":"%s","path":"%s","status_code":%d,"latency_ms":%d}',
-        request_id, request.method, str(request.url.path), response.status_code, latency_ms
+        request_id,
+        request.method,
+        str(request.url.path),
+        response.status_code,
+        latency_ms,
     )
     return response
 
 
+# Routers
 # routes.py already has prefix="/auth"
 app.include_router(auth_router)
 app.include_router(api_router, prefix="/api")
