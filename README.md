@@ -9,19 +9,19 @@ The system analyses email content using **rule-based heuristics** to identify po
 ---
 
 ## Features (Implemented)
-- Rule-based phishing email detection using heuristics
+- Rule-based phishing detection using heuristic analysis
 - Risk-based verdicts: **SAFE / SUSPICIOUS / PHISHING**
 - URL extraction and analysis
-- Scoring-based decision logic with explainable reasons
+- Header and attachment analysis
+- Explainable scoring with detection reasons
+- Email quarantine and report generation (CSV / PDF)
+- JWT-based authentication
 - Secure input validation and error handling
-- Structured logging with unique request identifiers
+- Structured logging with request identifiers
 
 ---
 
 ## Planned / Future Enhancements
-- Authentication and role-based access control (RBAC)
-- Two-factor authentication (2FA)
-- Email quarantine and reporting workflows
 - Machine-learning-based phishing classification
 - CI/CD pipeline automation using GitHub Actions
 - Static Application Security Testing (SAST)
@@ -31,12 +31,14 @@ The system analyses email content using **rule-based heuristics** to identify po
 ---
 
 ## Technology Stack
-- **Python (Flask)**
-- **Pytest** (unit and integration testing)
-- **GitHub Actions** (planned CI/CD)
-- **Bandit / Semgrep** (planned SAST)
-- **pip-audit** (dependency vulnerability scanning)
-- **OWASP ZAP** (planned DAST)
+- **Backend Framework:** FastAPI
+- **ASGI Server:** Uvicorn
+- **Authentication:** JWT, RBAC, TOTP (2FA)
+- **Security Libraries:** python-jose, passlib, pyotp
+- **Testing:** Pytest (unit, integration, security regression)
+- **Security Testing:** Input validation, access control enforcement
+- **CI/CD (Design):** GitHub Actions
+- **Planned Security Tools:** Bandit, Semgrep, pip-audit, OWASP ZAP
 
 ---
 
@@ -49,12 +51,23 @@ ci-cd/     - CI/CD pipeline documentation
 .github/   - GitHub Actions workflows
 ```
 
-## Run (Python / Flask)
+## Running the Application
 
 ### Local Setup
 
 ```bash
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python -m flask run
+uvicorn src.main:app --reload
+```
+
+### Access Points
+- API Base URL: http://127.0.0.1:8000
+- Swagger UI: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
+
+## Running Tests
+```bash
 pytest -q
 ```
