@@ -11,16 +11,16 @@ def _login_admin() -> str:
 
 
 def test_security_header_nosniff_present():
-    # OWASP: Security Misconfiguration regression check
+    # OWASP: Security Misconfiguration regression
     resp = client.get("/api/health")
     assert resp.status_code == 200
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
 
 
 def test_dos_prevention_email_too_large_returns_rejected():
-    # OWASP: DoS / resource exhaustion regression check
+    # OWASP: DoS / resource exhaustion regression
     token = _login_admin()
-    huge = "A" * 30000  # > default MAX_EMAIL_CHARS=20000
+    huge = "A" * 30000  # > default MAX_EMAIL_CHARS (20000)
 
     resp = client.post(
         "/api/scan-email",
@@ -34,16 +34,17 @@ def test_dos_prevention_email_too_large_returns_rejected():
 
 
 def test_internal_error_does_not_leak_stacktrace(monkeypatch):
-    # OWASP: Security Logging & Monitoring / Info Disclosure regression check
-    # Force an exception inside scan route via monkeypatch, then ensure generic 500 response.
+    # OWASP: Information Disclosure regression
     token = _login_admin()
 
-    from src.core import detector
+    # IMPORTANT: scan_email imports analyze_email directly in src.api.routes,
+    # so we must patch src.api.routes.analyze_email (not src.core.detector.analyze_email).
+    import src.api.routes as api_routes
 
     def boom(_text: str):
         raise RuntimeError("Sensitive stacktrace detail should not be exposed")
 
-    monkeypatch.setattr(detector, "analyze_email", boom)
+    monkeypatch.setattr(api_routes, "analyze_email", boom)
 
     resp = client.post(
         "/api/scan-email",
