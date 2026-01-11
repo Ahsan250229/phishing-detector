@@ -37,8 +37,8 @@ def test_internal_error_does_not_leak_stacktrace(monkeypatch):
     # OWASP: Information Disclosure regression
     token = _login_admin()
 
-    # IMPORTANT: scan_email imports analyze_email directly in src.api.routes,
-    # so we must patch src.api.routes.analyze_email (not src.core.detector.analyze_email).
+    # scan_email imports analyze_email directly in src.api.routes,
+    # so patch src.api.routes.analyze_email
     import src.api.routes as api_routes
 
     def boom(_text: str):
@@ -55,4 +55,4 @@ def test_internal_error_does_not_leak_stacktrace(monkeypatch):
     assert resp.status_code == 500
     body = resp.json()
     assert body.get("error") == "Internal Server Error"
-    assert "Sensitive stacktrace detail" not in resp.text
+    assert "Sensitive stacktrace detail should not be exposed" not in resp.text
