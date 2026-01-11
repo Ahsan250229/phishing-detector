@@ -1,7 +1,5 @@
-# src/models/schemas.py
 from __future__ import annotations
 
-import base64
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -25,7 +23,7 @@ class ScanResponse(BaseModel):
     reasons: List[str]
     urls: List[str]
 
-    # New evidence fields
+    # Evidence fields (for assessment/demo)
     header_score: int = 0
     header_findings: List[str] = []
     attachment_score: int = 0
