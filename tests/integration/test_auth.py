@@ -69,11 +69,10 @@ def test_otp_flow_enforced_on_protected_api():
 
     # Verify OTP (retry-safe)
     totp = pyotp.TOTP(secret)
-    code = totp.now()
     verified = client.post(
         "/auth/otp/verify",
         headers={"Authorization": f"Bearer {token}"},
-        json={"otp_code": code},
+        json={"otp_code": totp.now()},
     )
 
     if verified.status_code != 200:
