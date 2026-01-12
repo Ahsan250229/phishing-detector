@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from src.auth.routes import router as auth_router
 from src.api.routes import router as api_router
+from src.admin.routes import router as admin_router
 
 APP_ENV = os.getenv("APP_ENV", "development")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -22,7 +23,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-
 @app.middleware("http")
 async def add_request_id_logging_and_security_headers(request: Request, call_next):
     """
@@ -30,7 +30,7 @@ async def add_request_id_logging_and_security_headers(request: Request, call_nex
     - Add request correlation id (X-Request-ID)
     - Structured request logging
     - Prevent stacktrace leakage (generic 500 response)
-    - Add basic security header(s)
+    - Add basic security headers
     """
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     start = time.time()
@@ -54,6 +54,9 @@ async def add_request_id_logging_and_security_headers(request: Request, call_nex
     # Response headers
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
     # Structured logs
     logger.info(
@@ -66,8 +69,9 @@ async def add_request_id_logging_and_security_headers(request: Request, call_nex
     )
     return response
 
-
 # Routers
-# routes.py already has prefix="/auth"
+# - auth_router should already define its own prefix (commonly "/auth")
+# - api_router can define its own prefix in the router file; if not, we set "/api" here
 app.include_router(auth_router)
 app.include_router(api_router, prefix="/api")
+app.include_router(admin_router)  # admin router should define prefix="/admin" internally
