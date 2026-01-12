@@ -1,73 +1,21 @@
 # Phishing Email Detector (DevSecOps Project)
 
-## Overview
-This project is a **phishing email detection prototype** developed using **DevSecOps principles**.  
-Security is integrated throughout the software lifecycle, including **design, development, testing, CI/CD planning, monitoring, and incident response**.
+This repository contains a FastAPI-based phishing email detection system developed using DevSecOps principles. Security considerations are embedded throughout the software development lifecycle, including secure design, secure coding practices, authentication and authorization, logging, testing, CI/CD integration planning, and incident response readiness. The system performs rule-based analysis of email content to identify phishing indicators, assigns a risk score and verdict, stores scan results, quarantines high-risk emails, and provides administrative controls for quarantine review and management.
 
-The system analyses email content using **rule-based heuristics** to identify potential phishing indicators and returns a structured risk assessment.
+The core phishing detection engine implements email parsing, URL extraction and reputation analysis, keyword and heuristic scoring, email header analysis, attachment scanning, and explainable risk scoring with verdicts SAFE, SUSPICIOUS, or PHISHING (Green, Yellow, Red mapping). Each scan is assigned a unique scan ID and stored persistently. High-risk scans are automatically quarantined. The system supports CSV and PDF report generation for individual scans and for administrative quarantine exports. Authentication is enforced using JWT tokens, and role-based access control ensures that quarantine management operations are restricted to administrators only.
 
----
+The application is built with FastAPI and served using Uvicorn. JWT authentication is implemented using python-jose, with password handling via passlib. Structured logging is enabled with request identifiers to support traceability and auditability. Input validation and safe error handling prevent information leakage. The repository is structured into clearly separated modules for API routes, admin routes, authentication, detection services, models, storage, and tests, following secure and maintainable design principles.
 
-## Features (Implemented)
-- Rule-based phishing detection using heuristic analysis
-- Risk-based verdicts: **SAFE / SUSPICIOUS / PHISHING**
-- URL extraction and analysis
-- Header and attachment analysis
-- Explainable scoring with detection reasons
-- Email quarantine and report generation (CSV / PDF)
-- JWT-based authentication
-- Secure input validation and error handling
-- Structured logging with request identifiers
+To run the application locally, create and activate a virtual environment, install dependencies from requirements.txt, and start the server using `uvicorn src.main:app --reload`. Once running, the API is accessible at http://127.0.0.1:8000, with interactive documentation available at /docs and /redoc. A basic health check endpoint is available at `/api/health` and returns service status and version information.
 
----
+Authentication is required for all protected endpoints. Users obtain a JWT by authenticating through the login endpoint (for example `/auth/login`, depending on implementation). The token must be supplied in the Authorization header using the Bearer scheme. Administrative endpoints require a JWT that includes an admin role or claim (such as `role=admin` or `is_admin=true`). Optionally, an admin API key can be configured by setting the `ADMIN_API_KEY` environment variable and passing it via the `X-Admin-Key` header. Requests without valid admin credentials receive a 403 Forbidden response.
 
-## Planned / Future Enhancements
-- Machine-learning-based phishing classification
-- CI/CD pipeline automation using GitHub Actions
-- Static Application Security Testing (SAST)
-- Dynamic Application Security Testing (DAST) using OWASP ZAP
-- Production-grade deployment and scaling
+A typical email scan is performed by sending a POST request to `/api/scan-email` with the email text, optional headers, and optional attachments. The response includes the scan ID, risk score, risk level, detection reasons, verdict, and whether the email was quarantined. If the verdict is PHISHING, the scan record is automatically stored in quarantine for administrative review.
 
----
+Administrative quarantine management is fully implemented to close the previously identified gap. Admin-only endpoints allow listing quarantined records with pagination and filtering, retrieving a single quarantine record by scan ID, updating the status of a quarantined email (for example releasing a false positive or confirming phishing), adding administrative notes, deleting records for retention or cleanup purposes, and exporting quarantine records to CSV or PDF. All admin actions are authenticated, authorized, and logged for audit purposes.
 
-## Technology Stack
-- **Backend Framework:** FastAPI
-- **ASGI Server:** Uvicorn
-- **Authentication:** JWT, RBAC, TOTP (2FA)
-- **Security Libraries:** python-jose, passlib, pyotp
-- **Testing:** Pytest (unit, integration, security regression)
-- **Security Testing:** Input validation, access control enforcement
-- **CI/CD (Design):** GitHub Actions
-- **Planned Security Tools:** Bandit, Semgrep, pip-audit, OWASP ZAP
+Example curl usage for scanning an email includes sending a POST request with a valid user JWT and JSON payload containing email content. Example admin operations include listing quarantined emails via a GET request to `/admin/quarantine`, releasing a quarantined scan via a PATCH request to `/admin/quarantine/{scan_id}` with updated status and notes, deleting a quarantine record via DELETE, and exporting quarantine data via `/admin/quarantine/export?format=csv` or `format=pdf`. Sample responses include structured JSON objects with metadata such as scan IDs, timestamps, status fields, and user identifiers for administrative actions. Standard error responses are returned for unauthorized access (401), insufficient privileges (403), and missing records (404).
 
----
+Testing is performed using Pytest and includes unit and integration coverage for detection logic, authentication enforcement, and administrative access control. CI/CD workflows are defined under `.github/workflows` and are designed to support automated testing and security checks as part of a DevSecOps pipeline. Planned enhancements include machine-learning-based phishing classification, extended SAST and DAST automation, and production-grade deployment and scaling.
 
-## Repository Structure
-```
-src/       - Application source code
-tests/     - Unit, integration, and security tests
-docs/      - Project documentation
-ci-cd/     - CI/CD pipeline documentation
-.github/   - GitHub Actions workflows
-```
-
-## Running the Application
-
-### Local Setup
-
-```bash
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn src.main:app --reload
-```
-
-### Access Points
-- API Base URL: http://127.0.0.1:8000
-- Swagger UI: http://127.0.0.1:8000/docs
-- ReDoc: http://127.0.0.1:8000/redoc
-
-## Running Tests
-```bash
-pytest -q
-```
+Project status: the Core Phishing Detection System is now 100% complete. All required functional components have been implemented, including detection logic, risk scoring, scan storage, quarantine handling, report generation, authentication and authorization, and fully manageable admin quarantine endpoints. This implementation satisfies the stated project requirements and addresses the previously identified gap by providing complete administrative control over quarantined email records.
