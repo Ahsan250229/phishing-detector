@@ -35,6 +35,7 @@ def _seed_default_admin() -> None:
         role=UserRole.admin,
         otp_enabled=False,
         otp_secret=None,
+        is_active=True,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -43,8 +44,9 @@ def _seed_default_admin() -> None:
 
 _seed_default_admin()
 
-
-# ---- helper functions to access store ----
+# -------------------------
+# Store helpers
+# -------------------------
 
 def get_user_by_username(username: str) -> Optional[UserRecord]:
     return next((u for u in _USERS.values() if u.username == username), None)
@@ -60,12 +62,18 @@ def save_user(user: UserRecord) -> None:
 
 
 # -------------------------
-# Auth dependencies
+# Core auth dependency
 # -------------------------
 
 def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> UserRecord:
+    """
+    Base authentication dependency.
+    - Validates JWT
+    - Resolves user
+    - Attaches runtime OTP verification state
+    """
     token = creds.credentials
     try:
         payload = decode_token(token)
@@ -89,18 +97,21 @@ def get_current_user(
             detail="User not found or inactive",
         )
 
-    # Attach OTP state from token (runtime-only flag)
-    otp_verified = bool(payload.get("otp_verified", False))
-    user.__dict__["_otp_verified"] = otp_verified
+    # Runtime-only OTP verification flag (derived from token)
+    user.__dict__["_otp_verified"] = bool(payload.get("otp_verified", False))
 
     return user
 
+
+# -------------------------
+# 2FA enforcement
+# -------------------------
 
 def require_otp_verified(
     user: UserRecord = Depends(get_current_user),
 ) -> UserRecord:
     """
-    If user has 2FA enabled, block unless token indicates otp_verified=True.
+    Enforces OTP verification if user has 2FA enabled.
     """
     if user.otp_enabled:
         otp_ok = bool(getattr(user, "_otp_verified", False))
@@ -112,7 +123,17 @@ def require_otp_verified(
     return user
 
 
+# -------------------------
+# RBAC enforcement
+# -------------------------
+
 def require_role(role: UserRole) -> Callable:
+    """
+    Enforces role-based access control.
+    Implicitly enforces:
+      - JWT authentication
+      - OTP verification (if enabled)
+    """
     def _dep(user: UserRecord = Depends(require_otp_verified)) -> UserRecord:
         if user.role != role:
             raise HTTPException(
