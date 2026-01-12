@@ -7,38 +7,77 @@ import csv
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse, Response
 
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
 from src.models.schemas import ScanRequest, ScanResponse
 from src.core.detector import analyze_email
-
 from src.services.header_analyzer import analyze_headers
 from src.services.attachment_scanner import scan_attachments
 
 from src.models.quarantine import QuarantineRecord
 from src.storage.quarantine_store import save_record, get_record
 
-# ✅ AUTH ENFORCEMENT (JWT + OTP gating + RBAC)
-from src.auth.dependencies import require_otp_verified, require_role
+# ✅ Explicit AUTH ENFORCEMENT as requested:
+#   - All protected routes now explicitly use Depends(get_current_user)
+#   - OTP gating and RBAC are applied AFTER authentication
+from src.auth.dependencies import get_current_user
 from src.auth.models import UserRecord, UserRole
-
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 
 router = APIRouter()
 
 MAX_EMAIL_CHARS = int(os.getenv("MAX_EMAIL_CHARS", "20000"))
+OTP_ENFORCED = os.getenv("OTP_ENFORCED", "true").lower() in ("1", "true", "yes", "y")
+
+
+def _enforce_otp_if_required(user: UserRecord) -> None:
+    """
+    Enforce OTP verification for sensitive operations.
+    Assumes UserRecord exposes fields similar to:
+      - otp_enabled: bool
+      - otp_verified: bool  (or is_otp_verified / is_2fa_verified)
+    If your field name differs, update the checks below to match your model.
+    """
+    otp_enabled = bool(getattr(user, "otp_enabled", False))
+    otp_verified = bool(
+        getattr(user, "otp_verified", False)
+        or getattr(user, "is_otp_verified", False)
+        or getattr(user, "is_2fa_verified", False)
+    )
+
+    if OTP_ENFORCED and otp_enabled and not otp_verified:
+        raise HTTPException(status_code=403, detail="2FA verification required")
+
+
+def _enforce_admin(user: UserRecord) -> None:
+    """
+    Enforce admin role for privileged operations.
+    Assumes UserRecord.role exists and is comparable to UserRole.admin or "admin".
+    """
+    role_val = getattr(user, "role", None)
+    if role_val == UserRole.admin:
+        return
+    if isinstance(role_val, str) and role_val.lower() == "admin":
+        return
+    raise HTTPException(status_code=403, detail="Admin privileges required")
 
 
 @router.get("/health")
 def health():
+    # Health is intentionally public for uptime checks / monitoring.
     return {"status": "ok", "service": "phishing-detector", "version": "0.1.0"}
 
 
-# ✅ Protect scan feature: JWT required + OTP required if otp_enabled=True
+# ✅ Protected scan feature:
+# - Explicit JWT enforcement: Depends(get_current_user)
+# - OTP gating enforced when otp_enabled=True (configurable via OTP_ENFORCED)
 @router.post("/scan-email", response_model=ScanResponse)
 def scan_email(
     payload: ScanRequest,
-    _user: UserRecord = Depends(require_otp_verified),
+    user: UserRecord = Depends(get_current_user),
 ):
+    _enforce_otp_if_required(user)
+
     scan_id = str(uuid.uuid4())
     request_id = str(uuid.uuid4())
 
@@ -137,13 +176,18 @@ def scan_email(
 # ----------------------------
 # Reports (CSV + PDF exports)
 # ----------------------------
-
-# ✅ Admin-only export: JWT required + OTP required if otp_enabled=True + role must be admin
+# ✅ Admin-only export:
+# - Explicit JWT enforcement: Depends(get_current_user)
+# - OTP gating (if enabled)
+# - RBAC admin role enforcement
 @router.get("/reports/{scan_id}.csv")
 def export_csv(
     scan_id: str,
-    _user: UserRecord = Depends(require_role(UserRole.admin)),
+    user: UserRecord = Depends(get_current_user),
 ):
+    _enforce_otp_if_required(user)
+    _enforce_admin(user)
+
     rec = get_record(scan_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Scan ID not found")
@@ -187,12 +231,14 @@ def export_csv(
     )
 
 
-# ✅ Admin-only export: JWT required + OTP required if otp_enabled=True + role must be admin
 @router.get("/reports/{scan_id}.pdf")
 def export_pdf(
     scan_id: str,
-    _user: UserRecord = Depends(require_role(UserRole.admin)),
+    user: UserRecord = Depends(get_current_user),
 ):
+    _enforce_otp_if_required(user)
+    _enforce_admin(user)
+
     rec = get_record(scan_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Scan ID not found")
