@@ -6,6 +6,8 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from src.db import init_db
+
 from src.auth.routes import router as auth_router
 from src.api.routes import router as api_router
 from src.admin.routes import router as admin_router
@@ -22,6 +24,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 @app.middleware("http")
 async def add_request_id_logging_and_security_headers(request: Request, call_next):
