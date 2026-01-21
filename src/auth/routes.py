@@ -52,15 +52,6 @@ def register(payload: RegisterRequest) -> MessageResponse:
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest) -> TokenResponse:
-    """
-    Step A3 - /auth/login
-    - Accept username + password
-    - Load user record
-    - Verify password hash
-    - Decide if 2FA is required
-      * If 2FA NOT required -> issue normal JWT
-      * If 2FA required -> return requires_otp=True and issue ONLY an OTP-pending token
-    """
     user = get_user_by_username(payload.username)
     if not user or not user.is_active:
         raise HTTPException(
@@ -74,51 +65,27 @@ def login(payload: LoginRequest) -> TokenResponse:
             detail="Invalid credentials",
         )
 
-    # 2FA decision: prefer secret presence (examiner-friendly).
-    # IMPORTANT: ensure your dependencies map DB 'totp_secret' -> model 'otp_secret'.
-    otp_secret = (getattr(user, "otp_secret", None) or "").strip()
-    requires_otp = len(otp_secret) > 0
-
-    if not requires_otp:
-        # No 2FA: issue final token immediately.
-        token = create_access_token(
-            subject=user.id,
-            extra_claims={
-                "username": user.username,
-                "role": user.role.value,
-                "otp_verified": False,
-            },
-        )
-        return TokenResponse(access_token=token, requires_otp=False)
-
-    # 2FA required:
-    # Return requires_otp=True and issue ONLY an OTP-pending token (temporary).
-    # We return it in access_token to avoid changing your TokenResponse model.
-    # Your otp_verify endpoint should then "upgrade" to a final token.
-    temp_token = create_access_token(
+    # Create token; if OTP enabled, require OTP verification later.
+    token = create_access_token(
         subject=user.id,
         extra_claims={
             "username": user.username,
             "role": user.role.value,
-            "otp_verified": False,
-            "type": "otp_pending",
+            "otp_verified": False,  # upgraded after OTP verify
         },
-        # If your create_access_token supports expiry override, uncomment and use it:
-        # expires_minutes=5,
     )
-    return TokenResponse(access_token=temp_token, requires_otp=True)
+    return TokenResponse(access_token=token, requires_otp=user.otp_enabled)
 
 
 @router.post("/otp/setup", response_model=OTPSetupResponse)
 def otp_setup(user: UserRecord = Depends(get_current_user)) -> OTPSetupResponse:
     """
     Generates OTP secret and enables 2FA for the current user.
+    In a real system you may require re-authentication for this action.
     """
     secret = generate_otp_secret()
-
     user.otp_secret = secret
     user.otp_enabled = True
-    user.updated_at = datetime.utcnow()
     save_user(user)
 
     uri = provisioning_uri(secret=secret, username=user.username, issuer="PhishingDetector")
@@ -133,11 +100,10 @@ def otp_verify(
     """
     Verify user OTP and return upgraded token with otp_verified=true.
     """
-    otp_secret = (getattr(user, "otp_secret", None) or "").strip()
-    if not otp_secret:
+    if not user.otp_enabled or not user.otp_secret:
         raise HTTPException(status_code=400, detail="OTP not enabled for this user")
 
-    if not verify_otp_code(otp_secret, payload.otp_code):
+    if not verify_otp_code(user.otp_secret, payload.otp_code):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid OTP code",
